@@ -1,0 +1,11 @@
+{
+  "domain": "korea_ev_charger",
+  "name": "Korea EV Charger Cost",
+  "version": "1.0.0",
+  "documentation": "https://github.com/orosys/korea_ev_charger.git",
+  "dependencies": [],
+  "codeowners": [],
+  "requirements": [],
+  "iot_class": "local_polling",
+  "config_flow": true
+}

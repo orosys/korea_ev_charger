@@ -1,0 +1,6 @@
+{
+    "name": "Korea EV Charger Cost (한국 전기차 충전 요금 계산기)",
+    "country": "KR",
+    "domains": ["sensor"],
+    "render_readme": true
+}
