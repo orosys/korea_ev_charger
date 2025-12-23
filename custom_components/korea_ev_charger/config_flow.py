@@ -24,6 +24,7 @@ class KoreaEVChargerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required("voltage_type", default="low_voltage"): vol.In(
                     {"low_voltage": "저압 (Low Voltage)", "high_voltage": "고압 (High Voltage)"}
                 ),
+                vol.Required("billing_date", default=1): vol.All(vol.Coerce(int), vol.Range(min=1, max=31)),
                 vol.Optional("holiday_sensor"): EntitySelector(
                     EntitySelectorConfig(domain="binary_sensor")
                 ),
@@ -37,22 +38,26 @@ class KoreaEVChargerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 class OptionsFlowHandler(config_entries.OptionsFlow):
     """Handle options flow for rate adjustments."""
+
     async def async_step_init(self, user_input=None):
         """Manage the options."""
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
         
-        # self.config_entry는 부모 클래스에서 자동으로 제공됨
         voltage_type = self.config_entry.data.get("voltage_type", "low_voltage")
         defaults = DEFAULT_RATES[voltage_type]
-        
-        # 현재 저장된 옵션값 가져오기 (없으면 빈 딕셔너리)
         opts = self.config_entry.options
 
-        # 사용자가 단가를 커스텀하게 수정할 수 있도록 함
+        # 현재 설정된 결제일 가져오기 (기본값 1일)
+        # config_entry.data에 있을 수도 있고 options에 있을 수도 있음
+        current_billing_date = opts.get("billing_date", self.config_entry.data.get("billing_date", 1))
+
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema({
+                # 결제일 변경 옵션 추가
+                vol.Required("billing_date", default=current_billing_date): vol.All(vol.Coerce(int), vol.Range(min=1, max=31)),
+                
                 vol.Required("summer_max", default=opts.get("summer_max", defaults["summer"]["max"])): float,
                 vol.Required("summer_mid", default=opts.get("summer_mid", defaults["summer"]["mid"])): float,
                 vol.Required("summer_light", default=opts.get("summer_light", defaults["summer"]["light"])): float,

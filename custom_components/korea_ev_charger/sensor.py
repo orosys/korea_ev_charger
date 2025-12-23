@@ -1,6 +1,4 @@
-"""Sensor platform for Korea EV Charger."""
-import calendar
-# datetime은 타입 힌트용으로만 남기고, 실제 시간은 dt_util 사용
+"""Sensor platform for Korea EV Charger with monthly base rate."""
 from datetime import datetime
 import logging
 
@@ -10,7 +8,6 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import UnitOfEnergy
-# Home Assistant 표준 시간대 유틸리티 임포트
 import homeassistant.util.dt as dt_util
 from homeassistant.helpers.event import async_track_state_change_event, async_track_time_change
 from homeassistant.helpers.restore_state import RestoreEntity
@@ -25,11 +22,14 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     voltage_type = config_entry.data.get("voltage_type", "low_voltage")
     holiday_sensor = config_entry.data.get("holiday_sensor")
     
-    sensor = KoreaEVCostSensor(hass, source_sensor, voltage_type, holiday_sensor, config_entry)
+    # 설정된 결제일 가져오기 (없으면 1일)
+    billing_date = config_entry.options.get("billing_date", config_entry.data.get("billing_date", 1))
+    
+    sensor = KoreaEVCostSensor(hass, source_sensor, voltage_type, holiday_sensor, billing_date, config_entry)
     async_add_entities([sensor])
 
 class KoreaEVCostSensor(RestoreEntity, SensorEntity):
-    """Calculates cost based on TOU rates and daily base rate."""
+    """Calculates cost based on TOU rates and monthly base rate."""
 
     _attr_has_entity_name = True
     _attr_name = "EV Charging Cost"
@@ -37,12 +37,13 @@ class KoreaEVCostSensor(RestoreEntity, SensorEntity):
     _attr_device_class = SensorDeviceClass.MONETARY
     _attr_state_class = SensorStateClass.TOTAL
 
-    def __init__(self, hass, source_entity, voltage_type, holiday_sensor, config_entry):
+    def __init__(self, hass, source_entity, voltage_type, holiday_sensor, billing_date, config_entry):
         """Initialize the sensor."""
         self.hass = hass
         self._source_entity = source_entity
         self._voltage_type = voltage_type
         self._holiday_sensor = holiday_sensor
+        self._billing_date = billing_date
         self._config_entry = config_entry
         self._state = 0.0
         self._last_energy = None
@@ -69,23 +70,24 @@ class KoreaEVCostSensor(RestoreEntity, SensorEntity):
             )
         )
 
-        # 2. 매일 자정 기본요금 합산
+        # 2. 매월 지정된 결제일 자정에 기본요금 부과
+        # Utility Meter 리셋(00:00:00) 직후인 00:00:01에 실행하여 해당 월의 시작값으로 잡히게 함
         self.async_on_remove(
             async_track_time_change(
-                self.hass, self._async_daily_base_rate_update, hour=0, minute=0, second=0
+                self.hass, self._async_monthly_base_rate_update, hour=0, minute=0, second=1
             )
         )
 
-    async def _async_daily_base_rate_update(self, now):
-        """Add daily prorated base rate at midnight."""
+    async def _async_monthly_base_rate_update(self, now):
+        """Add full monthly base rate on the billing date."""
+        # 오늘이 설정된 결제일인지 확인
+        if now.day != self._billing_date:
+            return
+
         base_rate = DEFAULT_RATES[self._voltage_type]["base"]
         
-        _, days_in_month = calendar.monthrange(now.year, now.month)
-        
-        daily_base = base_rate / days_in_month
-        
-        self._state += daily_base
-        _LOGGER.debug("Daily base rate added: %f KRW", daily_base)
+        self._state += base_rate
+        _LOGGER.debug("Monthly base rate added on day %s: %f KRW", now.day, base_rate)
         self.async_write_ha_state()
 
     @property
@@ -95,7 +97,8 @@ class KoreaEVCostSensor(RestoreEntity, SensorEntity):
             "load_level": self._current_load_level,
             "season": self._current_season,
             "source_sensor": self._source_entity,
-            "base_rate_type": self._voltage_type
+            "base_rate_type": self._voltage_type,
+            "billing_date": self._billing_date
         }
 
     @property
@@ -107,6 +110,9 @@ class KoreaEVCostSensor(RestoreEntity, SensorEntity):
         defaults = DEFAULT_RATES[self._voltage_type]
         opts = self._config_entry.options
         
+        # 옵션에서 결제일이 변경되었을 수 있으므로 갱신
+        self._billing_date = opts.get("billing_date", self._billing_date)
+
         return {
             "summer": {
                 "max": opts.get("summer_max", defaults["summer"]["max"]),
