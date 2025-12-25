@@ -1,4 +1,4 @@
-"""Sensor platform for Korea EV Charger with monthly base rate."""
+"""Sensor platform for Korea EV Charger with taxes and extra fees."""
 from datetime import datetime
 import logging
 
@@ -12,7 +12,16 @@ import homeassistant.util.dt as dt_util
 from homeassistant.helpers.event import async_track_state_change_event, async_track_time_change
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from .const import DOMAIN, SEASONS, TIME_ZONES, DEFAULT_RATES
+from .const import (
+    DOMAIN, 
+    SEASONS, 
+    TIME_ZONES, 
+    DEFAULT_RATES, 
+    DEFAULT_CLIMATE_FEE, 
+    DEFAULT_FUEL_FEE,
+    DEFAULT_VAT_RATE,
+    DEFAULT_FUND_RATE
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -22,14 +31,13 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     voltage_type = config_entry.data.get("voltage_type", "low_voltage")
     holiday_sensor = config_entry.data.get("holiday_sensor")
     
-    # 설정된 결제일 가져오기 (없으면 1일)
     billing_date = config_entry.options.get("billing_date", config_entry.data.get("billing_date", 1))
     
     sensor = KoreaEVCostSensor(hass, source_sensor, voltage_type, holiday_sensor, billing_date, config_entry)
     async_add_entities([sensor])
 
 class KoreaEVCostSensor(RestoreEntity, SensorEntity):
-    """Calculates cost based on TOU rates and monthly base rate."""
+    """Calculates cost based on TOU rates including taxes."""
 
     _attr_has_entity_name = True
     _attr_name = "EV Charging Cost"
@@ -63,31 +71,43 @@ class KoreaEVCostSensor(RestoreEntity, SensorEntity):
             except ValueError:
                 self._state = 0.0
 
-        # 1. 전력 사용량 변화 감지
         self.async_on_remove(
             async_track_state_change_event(
                 self.hass, [self._source_entity], self._handle_energy_change
             )
         )
 
-        # 2. 매월 지정된 결제일 자정에 기본요금 부과
-        # Utility Meter 리셋(00:00:00) 직후인 00:00:01에 실행하여 해당 월의 시작값으로 잡히게 함
         self.async_on_remove(
             async_track_time_change(
                 self.hass, self._async_monthly_base_rate_update, hour=0, minute=0, second=1
             )
         )
 
+    def _get_tax_multiplier(self):
+        """Calculate total tax multiplier from options."""
+        opts = self._config_entry.options
+        vat_rate = opts.get("vat_rate", DEFAULT_VAT_RATE)
+        fund_rate = opts.get("fund_rate", DEFAULT_FUND_RATE)
+        
+        # 합계 승수 = 1 + (부가세율/100) + (기금율/100)
+        # 예: 1 + 0.1 + 0.037 = 1.137
+        return 1 + (vat_rate / 100.0) + (fund_rate / 100.0)
+
     async def _async_monthly_base_rate_update(self, now):
-        """Add full monthly base rate on the billing date."""
-        # 오늘이 설정된 결제일인지 확인
+        """Add full monthly base rate with tax."""
         if now.day != self._billing_date:
             return
 
         base_rate = DEFAULT_RATES[self._voltage_type]["base"]
         
-        self._state += base_rate
-        _LOGGER.debug("Monthly base rate added on day %s: %f KRW", now.day, base_rate)
+        # 세금 승수 가져오기
+        tax_multiplier = self._get_tax_multiplier()
+        
+        # 기본요금에도 세금 적용
+        final_base_rate = base_rate * tax_multiplier
+        
+        self._state += final_base_rate
+        _LOGGER.debug("Monthly base rate added: %f KRW (Multiplier: %f)", final_base_rate, tax_multiplier)
         self.async_write_ha_state()
 
     @property
@@ -103,17 +123,18 @@ class KoreaEVCostSensor(RestoreEntity, SensorEntity):
 
     @property
     def native_value(self):
-        """Return the total calculated cost rounded to 2 decimal places."""
         return round(self._state, 2)
 
     def _get_current_rates(self):
         defaults = DEFAULT_RATES[self._voltage_type]
         opts = self._config_entry.options
         
-        # 옵션에서 결제일이 변경되었을 수 있으므로 갱신
         self._billing_date = opts.get("billing_date", self._billing_date)
+        
+        climate_fee = opts.get("climate_fee", DEFAULT_CLIMATE_FEE)
+        fuel_fee = opts.get("fuel_fee", DEFAULT_FUEL_FEE)
 
-        return {
+        rates = {
             "summer": {
                 "max": opts.get("summer_max", defaults["summer"]["max"]),
                 "mid": opts.get("summer_mid", defaults["summer"]["mid"]),
@@ -130,6 +151,7 @@ class KoreaEVCostSensor(RestoreEntity, SensorEntity):
                 "light": opts.get("winter_light", defaults["winter"]["light"]),
             }
         }
+        return rates, climate_fee, fuel_fee
 
     def _determine_season_and_load(self, now):
         month = now.month
@@ -202,9 +224,16 @@ class KoreaEVCostSensor(RestoreEntity, SensorEntity):
         season, load_level = self._determine_season_and_load(now)
         self._current_load_level = load_level
 
-        rates = self._get_current_rates()
-        price = rates[season][load_level]
-        self._current_price = price
+        rates, climate_fee, fuel_fee = self._get_current_rates()
+        base_unit_price = rates[season][load_level]
+        
+        # 세금 승수 계산 (동적)
+        tax_multiplier = self._get_tax_multiplier()
+        
+        # 최종 단가 = (기본단가 + 기후요금 + 연료비) * (1 + 부가세% + 기금%)
+        final_unit_price = (base_unit_price + climate_fee + fuel_fee) * tax_multiplier
+        
+        self._current_price = final_unit_price
 
-        self._state += (diff * price)
+        self._state += (diff * final_unit_price)
         self.async_write_ha_state()

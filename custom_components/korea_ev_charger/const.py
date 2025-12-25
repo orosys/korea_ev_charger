@@ -1,9 +1,8 @@
 """Constants for Korea EV Charger integration."""
 
 DOMAIN = "korea_ev_charger"
-# https://cyber.kepco.co.kr/ckepco/mobile/cy_bill/bill_info_01.html
+
 # 기본 설정값 (저압 기준)
-# 사용자가 옵션에서 변경 가능하도록 Config Flow에서 이 값을 Default로 사용
 DEFAULT_RATES = {
     "low_voltage": {
         "base": 2390,
@@ -19,15 +18,21 @@ DEFAULT_RATES = {
     }
 }
 
-# 계절 정의
+# 추가 요금 기본값 (2025년 기준)
+DEFAULT_CLIMATE_FEE = 9.0  # 기후환경요금
+DEFAULT_FUEL_FEE = 5.0     # 연료비조정단가
+
+# 세금 및 기금 기본값 (%)
+DEFAULT_VAT_RATE = 10.0    # 부가가치세 (10%)
+DEFAULT_FUND_RATE = 3.7    # 전력산업기반기금 (3.7%)
+
+# 계절 및 시간대 정의
 SEASONS = {
     "summer": [6, 7, 8],
     "winter": [11, 12, 1, 2],
     "spring_fall": [3, 4, 5, 9, 10]
 }
 
-# 시간대 정의
-# 22:00~08:00 경부하 등
 TIME_ZONES = {
     "summer_spring_fall": {
         "light": [22, 23, 0, 1, 2, 3, 4, 5, 6, 7],

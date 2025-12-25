@@ -4,7 +4,14 @@ from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.helpers.selector import EntitySelector, EntitySelectorConfig
 
-from .const import DOMAIN, DEFAULT_RATES
+from .const import (
+    DOMAIN, 
+    DEFAULT_RATES, 
+    DEFAULT_CLIMATE_FEE, 
+    DEFAULT_FUEL_FEE,
+    DEFAULT_VAT_RATE,
+    DEFAULT_FUND_RATE
+)
 
 class KoreaEVChargerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow."""
@@ -48,16 +55,23 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         defaults = DEFAULT_RATES[voltage_type]
         opts = self.config_entry.options
 
-        # 현재 설정된 결제일 가져오기 (기본값 1일)
-        # config_entry.data에 있을 수도 있고 options에 있을 수도 있음
         current_billing_date = opts.get("billing_date", self.config_entry.data.get("billing_date", 1))
 
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema({
-                # 결제일 변경 옵션 추가
+                # 결제일
                 vol.Required("billing_date", default=current_billing_date): vol.All(vol.Coerce(int), vol.Range(min=1, max=31)),
                 
+                # 추가 요금 설정
+                vol.Required("climate_fee", default=opts.get("climate_fee", DEFAULT_CLIMATE_FEE)): float,
+                vol.Required("fuel_fee", default=opts.get("fuel_fee", DEFAULT_FUEL_FEE)): float,
+
+                # 세금 및 기금 설정 (추가됨)
+                vol.Required("vat_rate", default=opts.get("vat_rate", DEFAULT_VAT_RATE)): float,   # 부가세
+                vol.Required("fund_rate", default=opts.get("fund_rate", DEFAULT_FUND_RATE)): float, # 전력기금
+
+                # 계절별 단가
                 vol.Required("summer_max", default=opts.get("summer_max", defaults["summer"]["max"])): float,
                 vol.Required("summer_mid", default=opts.get("summer_mid", defaults["summer"]["mid"])): float,
                 vol.Required("summer_light", default=opts.get("summer_light", defaults["summer"]["light"])): float,
