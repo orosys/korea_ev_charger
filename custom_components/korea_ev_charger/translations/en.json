@@ -1,0 +1,49 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "title": "EV Charging Cost Setup",
+                "description": "Enter basic information for KEPCO EV charging cost calculation.",
+                "data": {
+                    "sensor_name": "Sensor Name (e.g. Tesla Charging Cost)",
+                    "source_sensor": "Charger Energy Sensor (kWh)",
+                    "voltage_type": "Contract Type",
+                    "contract_power": "Contract Power (kW)",
+                    "billing_date": "Billing Date (Monthly)",
+                    "holiday_sensor": "Holiday Sensor (Workday Sensor)"
+                }
+            }
+        },
+        "error": {
+            "unknown": "Unknown error occurred."
+        },
+        "abort": {
+            "already_configured": "Device is already configured."
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Rates & Options",
+                "description": "Adjust rates and additional settings for accurate calculation.",
+                "data": {
+                    "billing_date": "Billing Date (Monthly)",
+                    "contract_power": "Contract Power (kW)",
+                    "climate_fee": "Climate Env. Fee (KRW/kWh)",
+                    "fuel_fee": "Fuel Adjustment Fee (KRW/kWh)",
+                    "vat_rate": "VAT Rate (%)",
+                    "fund_rate": "Power Industry Fund Rate (%)",
+                    "summer_max": "Summer Max Load Rate",
+                    "summer_mid": "Summer Mid Load Rate",
+                    "summer_light": "Summer Light Load Rate",
+                    "sf_max": "Spring/Fall Max Load Rate",
+                    "sf_mid": "Spring/Fall Mid Load Rate",
+                    "sf_light": "Spring/Fall Light Load Rate",
+                    "winter_max": "Winter Max Load Rate",
+                    "winter_mid": "Winter Mid Load Rate",
+                    "winter_light": "Winter Light Load Rate"
+                }
+            }
+        }
+    }
+}

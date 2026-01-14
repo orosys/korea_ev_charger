@@ -5,7 +5,7 @@
                 "title": "전기차 충전 요금 계산기 설정",
                 "description": "한전 전기차 충전 요금 계산을 위한 기본 정보를 입력하세요.",
                 "data": {
-                    "sensor_name": "센서 이름 (예: 테슬라 충전 요금)",
+                    "sensor_name": "센서 이름 (예: Tesla Charging Cost)",
                     "source_sensor": "충전기 전력량 센서 (kWh)",
                     "voltage_type": "계약 종별",
                     "contract_power": "계약 전력 (kW)",
