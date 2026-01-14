@@ -2,7 +2,7 @@
 
 DOMAIN = "korea_ev_charger"
 
-# 기본 설정값 (저압 기준)
+# 기본 설정값
 DEFAULT_RATES = {
     "low_voltage": {
         "base": 2390,
@@ -18,18 +18,14 @@ DEFAULT_RATES = {
     }
 }
 
-# 계약 전력 기본값 (7kW)
 DEFAULT_CONTRACT_POWER = 7.0
+DEFAULT_SENSOR_NAME = "EV Charging Cost"
 
-# 추가 요금 기본값
-DEFAULT_CLIMATE_FEE = 9.0  # 기후환경요금
-DEFAULT_FUEL_FEE = 5.0     # 연료비조정단가
+DEFAULT_CLIMATE_FEE = 9.0
+DEFAULT_FUEL_FEE = 5.0
+DEFAULT_VAT_RATE = 10.0
+DEFAULT_FUND_RATE = 3.7
 
-# 세금 및 기금 기본값 (%)
-DEFAULT_VAT_RATE = 10.0    # 부가가치세
-DEFAULT_FUND_RATE = 3.7    # 전력산업기반기금
-
-# 계절 및 시간대 정의
 SEASONS = {
     "summer": [6, 7, 8],
     "winter": [11, 12, 1, 2],

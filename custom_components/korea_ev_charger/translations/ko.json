@@ -1,0 +1,49 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "title": "전기차 충전 요금 계산기 설정",
+                "description": "한전 전기차 충전 요금 계산을 위한 기본 정보를 입력하세요.",
+                "data": {
+                    "sensor_name": "센서 이름 (예: 테슬라 충전 요금)",
+                    "source_sensor": "충전기 전력량 센서 (kWh)",
+                    "voltage_type": "계약 종별",
+                    "contract_power": "계약 전력 (kW)",
+                    "billing_date": "결제 기준일 (매월)",
+                    "holiday_sensor": "공휴일 센서 (Workday Sensor)"
+                }
+            }
+        },
+        "error": {
+            "unknown": "알 수 없는 오류가 발생했습니다."
+        },
+        "abort": {
+            "already_configured": "이미 설정된 기기입니다."
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "요금 단가 및 옵션 설정",
+                "description": "정확한 계산을 위해 요금 단가와 추가 정보를 수정할 수 있습니다.",
+                "data": {
+                    "billing_date": "결제 기준일 (매월)",
+                    "contract_power": "계약 전력 (kW)",
+                    "climate_fee": "기후환경요금 (원/kWh)",
+                    "fuel_fee": "연료비조정단가 (원/kWh)",
+                    "vat_rate": "부가가치세 (%)",
+                    "fund_rate": "전력산업기반기금 (%)",
+                    "summer_max": "여름철 최대부하 단가",
+                    "summer_mid": "여름철 중간부하 단가",
+                    "summer_light": "여름철 경부하 단가",
+                    "sf_max": "봄/가을철 최대부하 단가",
+                    "sf_mid": "봄/가을철 중간부하 단가",
+                    "sf_light": "봄/가을철 경부하 단가",
+                    "winter_max": "겨울철 최대부하 단가",
+                    "winter_mid": "겨울철 중간부하 단가",
+                    "winter_light": "겨울철 경부하 단가"
+                }
+            }
+        }
+    }
+}
