@@ -1,4 +1,4 @@
-"""Sensor platform for Korea EV Charger with taxes and extra fees."""
+"""Sensor platform for Korea EV Charger with contract power."""
 from datetime import datetime
 import logging
 
@@ -13,14 +13,10 @@ from homeassistant.helpers.event import async_track_state_change_event, async_tr
 from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import (
-    DOMAIN, 
-    SEASONS, 
-    TIME_ZONES, 
-    DEFAULT_RATES, 
-    DEFAULT_CLIMATE_FEE, 
-    DEFAULT_FUEL_FEE,
-    DEFAULT_VAT_RATE,
-    DEFAULT_FUND_RATE
+    DOMAIN, SEASONS, TIME_ZONES, DEFAULT_RATES, 
+    DEFAULT_CLIMATE_FEE, DEFAULT_FUEL_FEE,
+    DEFAULT_VAT_RATE, DEFAULT_FUND_RATE,
+    DEFAULT_CONTRACT_POWER
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -84,41 +80,51 @@ class KoreaEVCostSensor(RestoreEntity, SensorEntity):
         )
 
     def _get_tax_multiplier(self):
-        """Calculate total tax multiplier from options."""
         opts = self._config_entry.options
         vat_rate = opts.get("vat_rate", DEFAULT_VAT_RATE)
         fund_rate = opts.get("fund_rate", DEFAULT_FUND_RATE)
-        
-        # 합계 승수 = 1 + (부가세율/100) + (기금율/100)
-        # 예: 1 + 0.1 + 0.037 = 1.137
         return 1 + (vat_rate / 100.0) + (fund_rate / 100.0)
 
     async def _async_monthly_base_rate_update(self, now):
-        """Add full monthly base rate with tax."""
+        """Add monthly base rate based on contract power."""
         if now.day != self._billing_date:
             return
 
-        base_rate = DEFAULT_RATES[self._voltage_type]["base"]
+        base_rate_per_kw = DEFAULT_RATES[self._voltage_type]["base"]
         
-        # 세금 승수 가져오기
+        # [중요] 계약 전력값 가져오기 (옵션 > 데이터 > 기본값 순)
+        contract_power = self._config_entry.options.get(
+            "contract_power", 
+            self._config_entry.data.get("contract_power", DEFAULT_CONTRACT_POWER)
+        )
+        
         tax_multiplier = self._get_tax_multiplier()
         
-        # 기본요금에도 세금 적용
-        final_base_rate = base_rate * tax_multiplier
+        # 최종 기본요금 = (단가 * 계약전력) * 세금승수
+        # 예: (2390 * 7) * 1.137 = 19022원
+        final_base_rate = (base_rate_per_kw * contract_power) * tax_multiplier
         
         self._state += final_base_rate
-        _LOGGER.debug("Monthly base rate added: %f KRW (Multiplier: %f)", final_base_rate, tax_multiplier)
+        _LOGGER.debug("Monthly base rate added: %f KRW (Contract: %f kW)", final_base_rate, contract_power)
         self.async_write_ha_state()
 
     @property
     def extra_state_attributes(self):
+        # 현재 적용된 계약 전력을 속성으로 보여줌
+        contract_power = self._config_entry.options.get(
+            "contract_power", 
+            self._config_entry.data.get("contract_power", DEFAULT_CONTRACT_POWER)
+        )
+        
         return {
             "current_price_per_kwh": self._current_price,
             "load_level": self._current_load_level,
             "season": self._current_season,
             "source_sensor": self._source_entity,
             "base_rate_type": self._voltage_type,
-            "billing_date": self._billing_date
+            "billing_date": self._billing_date,
+            "contract_power": contract_power,
+            "is_holiday_applied": self._is_holiday_now()
         }
 
     @property
@@ -128,7 +134,6 @@ class KoreaEVCostSensor(RestoreEntity, SensorEntity):
     def _get_current_rates(self):
         defaults = DEFAULT_RATES[self._voltage_type]
         opts = self._config_entry.options
-        
         self._billing_date = opts.get("billing_date", self._billing_date)
         
         climate_fee = opts.get("climate_fee", DEFAULT_CLIMATE_FEE)
@@ -153,6 +158,19 @@ class KoreaEVCostSensor(RestoreEntity, SensorEntity):
         }
         return rates, climate_fee, fuel_fee
 
+    def _is_holiday_now(self):
+        now = dt_util.now()
+        if now.weekday() == 6:
+            return True
+        if self._holiday_sensor:
+            hol_state = self.hass.states.get(self._holiday_sensor)
+            if hol_state:
+                if "workday" in self._holiday_sensor:
+                    return hol_state.state == "off"
+                else:
+                    return hol_state.state == "on"
+        return False
+
     def _determine_season_and_load(self, now):
         month = now.month
         hour = now.hour
@@ -170,18 +188,7 @@ class KoreaEVCostSensor(RestoreEntity, SensorEntity):
             
         self._current_season = season_key
 
-        is_holiday = False
-        if weekday == 6:
-            is_holiday = True
-        elif self._holiday_sensor:
-            hol_state = self.hass.states.get(self._holiday_sensor)
-            if hol_state:
-                if "workday" in self._holiday_sensor and hol_state.state == "off":
-                    is_holiday = True
-                elif "workday" not in self._holiday_sensor and hol_state.state == "on":
-                     is_holiday = True
-
-        if is_holiday:
+        if self._is_holiday_now():
             return season_key, "light"
 
         zones = TIME_ZONES[time_key]
@@ -227,10 +234,7 @@ class KoreaEVCostSensor(RestoreEntity, SensorEntity):
         rates, climate_fee, fuel_fee = self._get_current_rates()
         base_unit_price = rates[season][load_level]
         
-        # 세금 승수 계산 (동적)
         tax_multiplier = self._get_tax_multiplier()
-        
-        # 최종 단가 = (기본단가 + 기후요금 + 연료비) * (1 + 부가세% + 기금%)
         final_unit_price = (base_unit_price + climate_fee + fuel_fee) * tax_multiplier
         
         self._current_price = final_unit_price

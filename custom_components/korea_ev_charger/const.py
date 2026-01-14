@@ -18,13 +18,16 @@ DEFAULT_RATES = {
     }
 }
 
-# 추가 요금 기본값 (2025년 기준)
+# 계약 전력 기본값 (7kW)
+DEFAULT_CONTRACT_POWER = 7.0
+
+# 추가 요금 기본값
 DEFAULT_CLIMATE_FEE = 9.0  # 기후환경요금
 DEFAULT_FUEL_FEE = 5.0     # 연료비조정단가
 
 # 세금 및 기금 기본값 (%)
-DEFAULT_VAT_RATE = 10.0    # 부가가치세 (10%)
-DEFAULT_FUND_RATE = 3.7    # 전력산업기반기금 (3.7%)
+DEFAULT_VAT_RATE = 10.0    # 부가가치세
+DEFAULT_FUND_RATE = 3.7    # 전력산업기반기금
 
 # 계절 및 시간대 정의
 SEASONS = {
